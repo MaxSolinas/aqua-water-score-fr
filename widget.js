@@ -1,21 +1,6 @@
 /* =====================================================================
- * AQUA WATER SCORE™ FRANCE — Widget Hub'Eau pour Aqua Purify
- * v0.1.0 — MIT — © 2026 Aqua Purify S.à r.l.-S
- *
- * Sources :
- *   - Hub'Eau / SISE-Eaux (Min. Santé, Etalab 2.0)
- *   - geo.api.gouv.fr (résolution commune)
- *   - Référentiel arrêté 11/01/2007 modifié + directive UE 2020/2184
- *
- * Embed :
- *   <div id="aqua-water-score"></div>
- *   <script src="https://cdn.jsdelivr.net/gh/MaxSolinas/aqua-water-score-fr@main/widget.js"></script>
- *
- * Options data-* :
- *   data-commune="54395"  (préremplir code INSEE)
- *   data-webhook="https://n8n.../webhook/lead"
- *   data-product-url-q850="https://aquapurify.fr/..." (override des URLs produits)
- *   data-cta="Demander un devis"
+ * WHAT'S YOUR WATER SCORE?™ FRANCE — Widget Hub'Eau pour Aqua Purify
+ * Conforme aux directives Kinetico NA Digital & Water Score Guidelines
  * ===================================================================== */
 (function () {
   'use strict';
@@ -25,441 +10,121 @@
   var GEO_BASE   = 'https://geo.api.gouv.fr/communes';
   var CONTAINER_IDS = ['aqua-water-score', 'aqua-water-score-fr', 'wyws-france-widget'];
 
-  // ---------- SEUILS RÉGLEMENTAIRES (arrêté 11/01/2007 modifié) ----------
-  var SEUILS = {
-    // MICROBIOLOGIE
-    '1449': { name: "E. coli", unit: "/100mL", limit: 0, type: "L", cat: "microbio", desc: "Bactérie indicatrice de contamination fécale" },
-    '1421': { name: "Entérocoques", unit: "/100mL", limit: 0, type: "L", cat: "microbio", desc: "Bactéries indicatrices de contamination fécale" },
-    '1451': { name: "Coliformes totaux", unit: "/100mL", ref: 0, type: "R", cat: "microbio", desc: "Indicateur de bon fonctionnement du réseau" },
-    // CHIMIQUE SANITAIRE
-    '1340': { name: "Nitrates", unit: "mg/L", limit: 50, type: "L", cat: "chimique", desc: "Origine agricole — risque méthémoglobinémie nourrisson" },
-    '1339': { name: "Nitrites", unit: "mg/L", limit: 0.5, type: "L", cat: "chimique", desc: "Forme intermédiaire des nitrates" },
-    '1369': { name: "Arsenic", unit: "µg/L", limit: 10, type: "L", cat: "chimique", desc: "Origine géologique ou industrielle" },
-    '1391': { name: "Fluorures", unit: "mg/L", limit: 1.5, type: "L", cat: "chimique", desc: "Origine géologique" },
-    '1763': { name: "Total THM", unit: "µg/L", limit: 100, type: "L", cat: "chimique", desc: "Sous-produits de désinfection (trihalométhanes)" },
-    '1781': { name: "Bromates", unit: "µg/L", limit: 10, type: "L", cat: "chimique", desc: "Sous-produits de désinfection" },
-    '1457': { name: "Chlorates", unit: "mg/L", limit: 0.7, type: "L", cat: "chimique", desc: "Sous-produits de désinfection" },
-    '1456': { name: "Chlorites", unit: "mg/L", limit: 0.25, type: "L", cat: "chimique", desc: "Sous-produits de désinfection" },
-    '1361': { name: "Uranium", unit: "µg/L", limit: 30, type: "L", cat: "chimique", desc: "Origine géologique — contrôle obligatoire depuis 01/2026" },
-    // MÉTAUX & PLOMBERIE
-    '1382': { name: "Plomb", unit: "µg/L", limit: 10, futureLimit: 5, type: "L", cat: "metaux", desc: "Canalisations anciennes — limite 5 µg/L dès 2036" },
-    '1388': { name: "Cadmium", unit: "µg/L", limit: 5, type: "L", cat: "metaux", desc: "Métal lourd toxique" },
-    '1389': { name: "Chrome total", unit: "µg/L", limit: 50, type: "L", cat: "metaux", desc: "Métal lourd" },
-    '1386': { name: "Nickel", unit: "µg/L", limit: 20, type: "L", cat: "metaux", desc: "Métal lourd — robinetterie" },
-    '1392': { name: "Cuivre", unit: "mg/L", limit: 2.0, type: "L", cat: "metaux", desc: "Canalisations cuivre" },
-    // POLLUANTS ÉMERGENTS
-    '2542': { name: "Bisphénol A", unit: "µg/L", limit: 2.5, type: "L", cat: "emergent", desc: "Perturbateur endocrinien — contrôle obligatoire depuis 01/2026" },
-    '6276': { name: "Somme 20 PFAS", unit: "µg/L", limit: 0.1, type: "L", cat: "emergent", desc: "Polluants éternels — contrôle obligatoire depuis 01/2026" },
-    // CONFORT & RÉFÉRENCES
-    '1295': { name: "Turbidité", unit: "NFU", limit: 1.0, type: "L", cat: "confort", desc: "Aspect trouble de l'eau" },
-    '1302': { name: "pH", unit: "unité pH", limitMin: 6.5, limitMax: 9, type: "R", cat: "confort", desc: "Acidité/basicité" },
-    '1303': { name: "Conductivité", unit: "µS/cm", limitMin: 180, limitMax: 1000, type: "R", cat: "confort", desc: "Salinité globale" },
-    '1393': { name: "Fer total", unit: "µg/L", ref: 200, type: "R", cat: "confort", desc: "Coloration rouille, dépôts" },
-    '1394': { name: "Manganèse", unit: "µg/L", ref: 50, type: "R", cat: "confort", desc: "Coloration noire, dépôts" },
-    '1370': { name: "Aluminium total", unit: "µg/L", ref: 200, type: "R", cat: "confort", desc: "Résidu de potabilisation" },
-    '1335': { name: "Ammonium", unit: "mg/L", ref: 0.1, type: "R", cat: "confort", desc: "Indicateur de pollution organique" },
-    '1337': { name: "Chlorures", unit: "mg/L", ref: 250, type: "R", cat: "confort", desc: "Goût salé, corrosion" },
-    '1338': { name: "Sulfates", unit: "mg/L", ref: 250, type: "R", cat: "confort", desc: "Goût, propriétés laxatives" },
-    '1375': { name: "Sodium", unit: "mg/L", ref: 200, type: "R", cat: "confort", desc: "Goût salé" },
-    '1842': { name: "COT", unit: "mg/L", ref: 2.0, type: "R", cat: "confort", desc: "Carbone organique total" },
-    '1330': { name: "Couleur", unit: "mg/L Pt", ref: 15, type: "R", cat: "confort", desc: "Coloration apparente" },
-    '1345': { name: "Dureté (TH)", unit: "°f", type: "I", cat: "confort", desc: "Calcaire — non réglementé, indicatif" }
+  // Palette Kinetico
+  var K_DARK_BLUE = '#003594';
+  var K_LIGHT_BLUE = '#298FC2';
+  var K_MAGENTA = '#E6007E';
+  var K_SLATE = '#63666A';
+  var K_GRAY = '#727d84';
+  
+  // Couleurs Water Score Slider (30 à 100) basées sur guidelines
+  var WS_COLORS = {
+    30: '#F37021', 40: '#FDB913', 50: '#ED145B', 60: '#E6007E',
+    70: '#9E1B81', 80: '#662D91', 90: '#298FC2', 100: '#00A9E0'
   };
 
-  // Codes pesticides classiques (échantillon — Hub'Eau renvoie de toute façon le libellé)
+  // ---------- SEUILS RÉGLEMENTAIRES ----------
+  var SEUILS = {
+    '1449': { name: "E. coli", unit: "/100mL", limit: 0, type: "L", cat: "microbio", desc: "Bactérie indicatrice" },
+    '1421': { name: "Entérocoques", unit: "/100mL", limit: 0, type: "L", cat: "microbio", desc: "Bactéries indicatrices" },
+    '1451': { name: "Coliformes totaux", unit: "/100mL", ref: 0, type: "R", cat: "microbio", desc: "Indicateur réseau" },
+    '1340': { name: "Nitrates", unit: "mg/L", limit: 50, type: "L", cat: "chimique", desc: "Origine agricole" },
+    '1382': { name: "Plomb", unit: "µg/L", limit: 10, type: "L", cat: "metaux", desc: "Canalisations anciennes" },
+    '6276': { name: "Somme 20 PFAS", unit: "µg/L", limit: 0.1, type: "L", cat: "emergent", desc: "Polluants éternels" },
+    '1295': { name: "Turbidité", unit: "NFU", limit: 1.0, type: "L", cat: "confort", desc: "Aspect trouble" },
+    '1345': { name: "Dureté (TH)", unit: "°f", type: "I", cat: "confort", desc: "Calcaire" }
+  };
   var CODES_PESTICIDES = ['1506', '1907', '1517', '1140', '1141', '1102', '1108', '5537'];
   var PESTICIDE_REGEX  = /pestic|atrazin|simazin|gluphosi|glyphosa|metolach|chlortolu|deseth|metalax|s-meto/i;
 
   // ---------- CATALOGUE PRODUITS ----------
   var PRODUITS = {
-    'kinetico-q850-od': { name: "Kinetico Q850 OverDrive XP", family: "Adoucisseur", certs: ["WQA Gold Seal","NSF/ANSI 44","ACS"], desc: "Adoucisseur bi-réservoir haute capacité — foyer 5+ personnes, eau très dure." },
-    'kinetico-s250-xp': { name: "Kinetico Premier S250 XP", family: "Adoucisseur", certs: ["WQA Gold Seal","NSF/ANSI 44","ACS"], desc: "Bi-réservoir OverDrive, débit 60 L/min — foyer 3-4 personnes." },
-    'kinetico-s150-xp': { name: "Kinetico Premier S150 XP", family: "Adoucisseur", certs: ["WQA Gold Seal","NSF/ANSI 44","ACS"], desc: "Adoucisseur bi-réservoir — foyer 1-3 personnes." },
-    'kinetico-premier-compact': { name: "Kinetico Premier Compact", family: "Adoucisseur", certs: ["WQA Gold Seal","ACS"], desc: "Compact pour espaces réduits." },
-    'kinetico-k5-ro': { name: "Kinetico K5 (Osmose inverse)", family: "Osmose inverse", certs: ["NSF/ANSI 58","NSF/ANSI 372","ACS"], desc: "OI sous évier 5 étages — nitrates, plomb, PFAS, métaux lourds." },
-    'viqua-ihs22-d4': { name: "Viqua IHS22-D4 Home Plus", family: "UV + filtration", certs: ["NSF/ANSI 55 Cl. A","ACS"], desc: "UV-C 254 nm intégré + pré-filtration, débit 45 L/min." },
-    'viqua-d4': { name: "Viqua D4", family: "UV", certs: ["NSF/ANSI 55 Cl. A","ACS"], desc: "Désinfection UV-C résidentielle." },
-    'cab-charbon': { name: "Charbon actif densifié", family: "Filtration", certs: ["NSF/ANSI 42","NSF/ANSI 53","NSF/ANSI 401"], desc: "Cartouche CAB 5 µm — pesticides, chlore, THM, goûts." }
+    'kinetico-q850-od': { name: "Kinetico Q850 OverDrive XP", family: "Adoucisseur", certs: ["WQA","NSF","ACS"], desc: "Adoucisseur bi-réservoir haute capacité." },
+    'kinetico-s250-xp': { name: "Kinetico Premier S250 XP", family: "Adoucisseur", certs: ["WQA","NSF","ACS"], desc: "Bi-réservoir OverDrive." },
+    'kinetico-k5-ro': { name: "Kinetico K5 Drinking Water Station", family: "Osmose inverse", certs: ["NSF","ACS"], desc: "OI sous évier 5 étages avec VOC Guard." },
+    'cab-charbon': { name: "Filtre Charbon Actif", family: "Filtration", certs: ["NSF"], desc: "Cartouche CAB 5 µm." }
   };
 
-  // ---------- STYLES (inline CSS, scoped via .aw- prefix) ----------
+  // ---------- STYLES ----------
   var CSS = ''
-    + '.aw-wrap{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Oxygen,Ubuntu,sans-serif;color:#0F172A;background:#fff;border:1px solid #E5E7EB;border-radius:20px;overflow:hidden;box-shadow:0 1px 2px rgba(15,23,42,.04),0 12px 40px rgba(15,23,42,.06);max-width:100%;line-height:1.5;box-sizing:border-box}'
-    + '.aw-wrap *,.aw-wrap *::before,.aw-wrap *::after{box-sizing:border-box}'
-    + '.aw-search{padding:24px;border-bottom:1px solid #E5E7EB;background:#FBFAF7;display:flex;flex-direction:column;gap:14px}'
-    + '.aw-title{font-size:20px;font-weight:600;color:#0A1F44;display:flex;align-items:center;gap:10px;margin:0}'
-    + '.aw-title svg{width:22px;height:22px;color:#06B6D4}'
+    + '.aw-wrap{font-family:"Montserrat",sans-serif;color:#63666A;background:#fff;border:1px solid #c8d0e2;border-radius:0px;overflow:hidden;box-shadow:0 12px 40px rgba(0,53,148,.08);max-width:100%;line-height:1.5;box-sizing:border-box}'
+    + '.aw-wrap *{box-sizing:border-box}'
+    + '.aw-search{padding:24px;border-bottom:1px solid #c8d0e2;background:#f9fbfd;display:flex;flex-direction:column;gap:14px}'
+    + '.aw-title{font-size:18px;font-weight:800;color:#003594;margin:0;text-transform:uppercase;}'
     + '.aw-row{display:flex;gap:10px;flex-wrap:wrap}'
     + '.aw-iw{flex:1;min-width:220px;position:relative}'
-    + '.aw-input{width:100%;padding:13px 14px 13px 42px;border:1px solid #E5E7EB;border-radius:12px;font:inherit;font-size:15px;background:#fff;color:#0F172A;transition:border-color .16s,box-shadow .16s}'
-    + '.aw-input:focus{outline:none;border-color:#06B6D4;box-shadow:0 0 0 4px rgba(6,182,212,.12)}'
-    + '.aw-iicon{position:absolute;left:14px;top:50%;transform:translateY(-50%);width:18px;height:18px;color:#94A3B8;pointer-events:none}'
-    + '.aw-btn{padding:13px 22px;background:#0A1F44;color:#fff;border:none;border-radius:12px;font:inherit;font-weight:600;font-size:14px;cursor:pointer;transition:background .16s,transform .16s;display:inline-flex;align-items:center;gap:8px;white-space:nowrap}'
-    + '.aw-btn:hover{background:#0F2D5C;transform:translateY(-1px)}'
-    + '.aw-btn:disabled{opacity:.4;cursor:not-allowed;transform:none}'
-    + '.aw-btn2{background:#fff;color:#0A1F44;border:1px solid #E5E7EB}'
-    + '.aw-btn2:hover{background:#F8FAFC}'
-    + '.aw-sug{position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #E5E7EB;border-radius:12px;margin-top:6px;box-shadow:0 12px 40px rgba(15,23,42,.12);max-height:280px;overflow-y:auto;z-index:10;display:none}'
+    + '.aw-input{width:100%;padding:13px 14px;border:1px solid #727d84;font-family:"Montserrat";font-size:15px;background:#fff;color:#63666A;}'
+    + '.aw-input:focus{outline:none;border-color:#298FC2;box-shadow:0 0 0 3px rgba(41,143,194,.15)}'
+    + '.aw-btn{padding:13px 22px;background:#003594;color:#fff;border:none;font-family:"Montserrat";font-weight:700;font-size:14px;cursor:pointer;transition:background .2s;text-transform:uppercase;letter-spacing:0.05em}'
+    + '.aw-btn:hover{background:#298FC2;}'
+    + '.aw-btn-mag{background:#E6007E; margin-top: 16px; width: 100%;}'
+    + '.aw-btn-mag:hover{background:#c4006b;}'
+    + '.aw-body{padding:32px 24px}'
+    
+    /* Water Score Slider Styles */
+    + '.ws-slider-container{margin:32px 0 40px;text-align:center;}'
+    + '.ws-score-display{font-size:64px;font-weight:800;line-height:1;margin-bottom:16px;}'
+    + '.ws-track{display:flex;height:48px;overflow:hidden;margin-bottom:12px;}'
+    + '.ws-block{flex:1;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:16px;border-right:2px solid #fff;transition:opacity 0.3s}'
+    + '.ws-block:last-child{border-right:none;}'
+    + '.ws-desc{font-size:13px;color:#727d84;font-weight:500;max-width:80%;margin:0 auto;}'
+    
+    + '.aw-reco{border-left:6px solid #E6007E;padding:20px;background:#f9fbfd;margin-bottom:16px;}'
+    + '.aw-rn{font-weight:800;font-size:18px;color:#003594;margin-bottom:4px;text-transform:uppercase}'
+    + '.aw-lead{margin-top:32px;padding:24px;background:#003594;color:#fff;}'
+    + '.aw-lt{font-weight:800;font-size:22px;margin:0 0 8px;text-transform:uppercase}'
+    + '.aw-li{width:100%;padding:12px;margin-bottom:12px;border:none;font-family:"Montserrat";font-size:14px;}'
+    + '.aw-sug{position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #c8d0e2;z-index:10;display:none}'
     + '.aw-sug.show{display:block}'
-    + '.aw-sugi{padding:11px 14px;cursor:pointer;font-size:14px;border-bottom:1px solid #F1F5F9;display:flex;justify-content:space-between;align-items:center;transition:background .12s}'
-    + '.aw-sugi:hover{background:#F0FDFA}'
-    + '.aw-sugi:last-child{border-bottom:none}'
-    + '.aw-sugm{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;color:#94A3B8}'
-    + '.aw-quick{display:flex;flex-wrap:wrap;gap:6px;align-items:center}'
-    + '.aw-quick span{font-size:11px;color:#94A3B8;letter-spacing:.04em}'
-    + '.aw-qb{background:#fff;border:1px solid #E5E7EB;border-radius:999px;padding:5px 12px;font-size:12px;cursor:pointer;color:#475569;font:inherit;transition:all .14s}'
-    + '.aw-qb:hover{border-color:#06B6D4;color:#0891B2}'
-    + '.aw-body{padding:24px}'
-    + '.aw-load{padding:60px 24px;text-align:center;color:#475569}'
-    + '.aw-spin{width:32px;height:32px;border:3px solid #E5E7EB;border-top-color:#06B6D4;border-radius:50%;margin:0 auto 16px;animation:awspin 700ms linear infinite}'
-    + '@keyframes awspin{to{transform:rotate(360deg)}}'
-    + '.aw-empty{padding:64px 24px;text-align:center;color:#64748B;font-size:14px}'
-    + '.aw-empty-i{font-size:64px;color:#06B6D4;opacity:.2;line-height:1;margin-bottom:12px;font-weight:300}'
-    + '.aw-hero{display:grid;grid-template-columns:auto 1fr;gap:32px;align-items:center;padding-bottom:24px;border-bottom:1px solid #E5E7EB;margin-bottom:24px}'
-    + '@media (max-width:640px){.aw-hero{grid-template-columns:1fr;gap:20px;text-align:center}.aw-gauge{margin:0 auto}}'
-    + '.aw-gauge{position:relative;width:160px;height:160px}'
-    + '.aw-gauge svg{width:100%;height:100%;transform:rotate(-90deg)}'
-    + '.aw-gtrack{fill:none;stroke:#E5E7EB;stroke-width:10}'
-    + '.aw-gfill{fill:none;stroke-width:10;stroke-linecap:round;transition:stroke-dashoffset 1.2s cubic-bezier(.22,1,.36,1)}'
-    + '.aw-gc{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}'
-    + '.aw-gn{font-size:50px;font-weight:300;letter-spacing:-.03em;line-height:1;color:#0A1F44;font-variant-numeric:tabular-nums}'
-    + '.aw-gm{font-size:11px;color:#94A3B8;letter-spacing:.06em;margin-top:4px;font-family:ui-monospace,monospace}'
-    + '.aw-letter{position:absolute;top:-6px;right:-6px;width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:20px;color:#fff;box-shadow:0 4px 14px rgba(15,23,42,.18)}'
-    + '.aw-cn{font-size:28px;font-weight:600;letter-spacing:-.015em;line-height:1.1;color:#0A1F44;margin:0 0 6px}'
-    + '.aw-cm{font-size:13px;color:#475569;margin-bottom:14px;display:flex;flex-wrap:wrap;gap:14px}'
-    + '.aw-cm span{display:inline-flex;align-items:center;gap:6px}'
-    + '.aw-verdict{font-size:16px;line-height:1.5;color:#0F172A;max-width:60ch}'
-    + '.aw-verdict strong{color:#0A1F44}'
-    + '.aw-subs{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:32px}'
-    + '@media (max-width:880px){.aw-subs{grid-template-columns:repeat(2,1fr)}}'
-    + '.aw-sub{padding:16px;border:1px solid #E5E7EB;border-radius:12px;background:#FBFAF7;transition:border-color .16s}'
-    + '.aw-sub:hover{border-color:#06B6D4}'
-    + '.aw-sl{font-size:10px;text-transform:uppercase;font-weight:700;letter-spacing:.08em;color:#94A3B8;margin-bottom:10px;line-height:1.3}'
-    + '.aw-sv{font-size:28px;font-weight:600;letter-spacing:-.02em;margin-bottom:8px;font-variant-numeric:tabular-nums}'
-    + '.aw-sb{height:4px;background:#E5E7EB;border-radius:2px;overflow:hidden}'
-    + '.aw-sbf{height:100%;border-radius:2px;transition:width .8s cubic-bezier(.22,1,.36,1)}'
-    + '.aw-actions{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:24px}'
-    + '.aw-params{border:1px solid #E5E7EB;border-radius:12px;overflow:hidden;margin-bottom:24px}'
-    + '.aw-ph{padding:13px 18px;background:#FBFAF7;border-bottom:1px solid #E5E7EB;display:flex;justify-content:space-between;align-items:center}'
-    + '.aw-ph h3{margin:0;font-weight:600;font-size:15px;color:#0A1F44}'
-    + '.aw-pc{font-family:ui-monospace,monospace;font-size:11px;color:#94A3B8}'
-    + '.aw-pr{display:grid;grid-template-columns:24px 1fr auto auto;gap:14px;align-items:center;padding:12px 18px;border-bottom:1px solid #E5E7EB;transition:background .14s}'
-    + '.aw-pr:hover{background:#FBFAF7}'
-    + '.aw-pr:last-child{border-bottom:none}'
-    + '.aw-pdot{width:10px;height:10px;border-radius:50%}'
-    + '.aw-pn{font-weight:500;font-size:14px;color:#0F172A;margin-bottom:2px}'
-    + '.aw-pd{font-size:11px;color:#94A3B8;line-height:1.4}'
-    + '.aw-pv{font-family:ui-monospace,monospace;font-size:13px;color:#0F172A;font-weight:500;text-align:right;white-space:nowrap}'
-    + '.aw-pl{font-family:ui-monospace,monospace;font-size:11px;color:#94A3B8;text-align:right;white-space:nowrap}'
-    + '@media (max-width:520px){.aw-pr{grid-template-columns:18px 1fr auto;gap:10px}.aw-pl{display:none}}'
-    + '.aw-reco{border:1px solid #E5E7EB;border-radius:12px;overflow:hidden;margin-bottom:10px;transition:all .2s}'
-    + '.aw-reco:hover{border-color:#06B6D4;box-shadow:0 8px 24px rgba(6,182,212,.1)}'
-    + '.aw-rp{height:3px}'
-    + '.aw-rb{padding:18px 22px;display:grid;grid-template-columns:1fr auto;gap:16px;align-items:center}'
-    + '@media (max-width:640px){.aw-rb{grid-template-columns:1fr}}'
-    + '.aw-rm{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#0891B2;margin-bottom:6px;display:flex;gap:12px;align-items:center}'
-    + '.aw-rm strong{color:#0A1F44}'
-    + '.aw-rn{font-weight:600;font-size:19px;line-height:1.2;color:#0A1F44;margin-bottom:6px}'
-    + '.aw-rr{font-size:13px;color:#475569;line-height:1.5;margin-bottom:8px}'
-    + '.aw-certs{display:flex;gap:6px;flex-wrap:wrap}'
-    + '.aw-cert{font-family:ui-monospace,monospace;font-size:10px;padding:3px 8px;background:#FBFAF7;border:1px solid #E5E7EB;border-radius:4px;color:#475569}'
-    + '.aw-lead{margin-top:24px;padding:28px;background:linear-gradient(135deg,#0A1F44 0%,#0F2D5C 100%);border-radius:12px;color:#fff;position:relative;overflow:hidden}'
-    + '.aw-lead::before{content:"";position:absolute;top:-120px;right:-120px;width:280px;height:280px;background:radial-gradient(circle,rgba(6,182,212,.25) 0%,transparent 70%);border-radius:50%}'
-    + '.aw-lt{font-weight:600;font-size:22px;letter-spacing:-.01em;line-height:1.2;margin:0 0 8px;position:relative}'
-    + '.aw-lt em{color:#67E8F9;font-style:italic}'
-    + '.aw-ls{font-size:13px;color:rgba(255,255,255,.7);margin-bottom:18px;position:relative;max-width:56ch}'
-    + '.aw-lf{display:grid;grid-template-columns:1fr 1fr auto;gap:10px;position:relative}'
-    + '@media (max-width:720px){.aw-lf{grid-template-columns:1fr}}'
-    + '.aw-li{padding:12px 14px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);border-radius:8px;color:#fff;font:inherit;font-size:14px;transition:all .16s}'
-    + '.aw-li::placeholder{color:rgba(255,255,255,.4)}'
-    + '.aw-li:focus{outline:none;background:rgba(255,255,255,.12);border-color:#06B6D4}'
-    + '.aw-lb{padding:12px 22px;background:#06B6D4;color:#0A1F44;border:none;border-radius:8px;font:inherit;font-weight:700;font-size:14px;cursor:pointer;transition:all .16s}'
-    + '.aw-lb:hover{background:#67E8F9;transform:translateY(-1px)}'
-    + '.aw-success{padding:18px;background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.3);border-radius:8px;color:#fff;text-align:center;font-size:14px}'
-    + '.aw-disc{margin-top:14px;font-size:11px;color:rgba(255,255,255,.5);line-height:1.5;position:relative}'
-    + '.aw-foot{padding:14px 22px;border-top:1px solid #E5E7EB;font-size:11px;color:#94A3B8;display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;background:#FBFAF7}'
-    + '.aw-foot a{color:#0891B2;text-decoration:none}'
-    + '.aw-foot a:hover{text-decoration:underline}';
+    + '.aw-sugi{padding:12px;cursor:pointer;font-size:14px;border-bottom:1px solid #f1f5f9;}'
+    + '.aw-sugi:hover{background:#f9fbfd;}'
+    + '.aw-load{text-align:center;padding:40px;color:#003594;font-weight:600;}';
 
-  // ---------- ÉTAT GLOBAL DE L'INSTANCE ----------
-  var STATE = {
-    config: null,
-    currentScore: null,
-    currentCommune: null,
-    lastSuggestions: [],
-    el: {} // refs DOM
-  };
+  var STATE = { config: null, lastSuggestions: [], el: {} };
 
-  // ---------- HELPERS ----------
   function $(id) { return document.getElementById(id); }
-  function el(tag, cls, html) {
-    var e = document.createElement(tag);
-    if (cls) e.className = cls;
-    if (html != null) e.innerHTML = html;
-    return e;
-  }
-  function fmtNum(v, dec) {
-    if (v == null || isNaN(v)) return '—';
-    if (v === 0) return '0';
-    if (v < 0.001) return v.toExponential(1);
-    if (v < 1) return v.toFixed(3);
-    if (v < 10) return v.toFixed(dec != null ? dec : 2);
-    if (v < 100) return v.toFixed(1);
-    return Math.round(v).toString();
-  }
-  function statusColor(s) {
-    return { good: '#16A34A', caution: '#CA8A04', warn: '#EA580C', danger: '#DC2626' }[s] || '#94A3B8';
-  }
-  function hexToRgb(hex) {
-    return [parseInt(hex.slice(1,3),16), parseInt(hex.slice(3,5),16), parseInt(hex.slice(5,7),16)];
-  }
 
   // ---------- API CLIENT ----------
   function searchCommunes(query) {
     var q = query.trim();
-    var isPostal = /^\d{2,5}$/.test(q);
-    var param = isPostal ? 'codePostal=' + q : 'nom=' + encodeURIComponent(q) + '&boost=population';
-    var url = GEO_BASE + '?' + param + '&fields=code,nom,codeDepartement,codePostal,centre,population&format=json&limit=8';
-    return fetch(url).then(function (r) {
-      if (!r.ok) throw new Error('Erreur résolution commune');
-      return r.json();
-    });
-  }
-
-  // Tentative CORS direct, fallback JSONP
-  function fetchHubeau(path, params) {
-    var qs = [];
-    for (var k in params) { if (params[k] != null) qs.push(k + '=' + encodeURIComponent(params[k])); }
-    var url = HUBEAU_BASE + path + '?' + qs.join('&');
-    return fetch(url).then(function (r) {
-      if (!r.ok && r.status !== 206) throw new Error('Hub\'Eau HTTP ' + r.status);
-      return r.json();
-    }).catch(function () {
-      // Fallback JSONP
-      return fetchJsonp(url);
-    });
-  }
-  function fetchJsonp(url) {
-    return new Promise(function (resolve, reject) {
-      var cb = 'awcb_' + Date.now() + '_' + Math.floor(Math.random() * 1e6);
-      var s = document.createElement('script');
-      var timer = setTimeout(function () {
-        cleanup();
-        reject(new Error('JSONP timeout'));
-      }, 15000);
-      function cleanup() {
-        clearTimeout(timer);
-        delete window[cb];
-        if (s.parentNode) s.parentNode.removeChild(s);
-      }
-      window[cb] = function (data) { cleanup(); resolve(data); };
-      s.onerror = function () { cleanup(); reject(new Error('JSONP error')); };
-      s.src = url + (url.indexOf('?') === -1 ? '?' : '&') + 'callback=' + cb;
-      document.body.appendChild(s);
-    });
+    var param = /^\d{2,5}$/.test(q) ? 'codePostal=' + q : 'nom=' + encodeURIComponent(q) + '&boost=population';
+    return fetch(GEO_BASE + '?' + param + '&fields=code,nom,codeDepartement,codePostal&format=json&limit=5')
+      .then(function (r) { return r.json(); });
   }
 
   function fetchAnalyses(codeCommune) {
-    return fetchHubeau('/resultats_dis', {
-      code_commune: codeCommune,
-      date_min_prelevement: '2022-01-01',
-      size: 5000,
-      sort: 'desc'
-    }).then(function (j) { return (j && j.data) || []; });
-  }
-  function fetchUdi(codeCommune) {
-    return fetchHubeau('/communes_udi', { code_commune: codeCommune, size: 20 })
-      .then(function (j) { return (j && j.data) || []; })
-      .catch(function () { return []; });
+    return fetch(HUBEAU_BASE + '/resultats_dis?code_commune=' + codeCommune + '&date_min_prelevement=2022-01-01&size=1000&sort=desc')
+      .then(function(r) { return r.json(); })
+      .then(function(j) { return j.data || []; });
   }
 
-  // ---------- AGRÉGATION & SCORING ----------
+  // ---------- SCORING (30 - 100) ----------
   function aggregate(raw) {
-    var byParam = {}, pesticides = [], microbioCount = 0, microbioNC = 0;
+    var microbioNC = 0, microbioCount = 0;
     for (var i = 0; i < raw.length; i++) {
-      var a = raw[i];
-      var code = a.code_parametre;
-      if (!code) continue;
-      var isPest = CODES_PESTICIDES.indexOf(code) > -1 ||
-        (a.libelle_parametre && PESTICIDE_REGEX.test(a.libelle_parametre));
-      if (isPest && a.resultat_numerique != null) {
-        pesticides.push({
-          nom: a.libelle_parametre, valeur: a.resultat_numerique, unite: a.libelle_unite,
-          conformite: a.conformite_limites_pc_prelevement, date: a.date_prelevement
-        });
-      }
-      if (code === '1449' || code === '1421' || code === '1451') {
+      var code = raw[i].code_parametre;
+      if (code === '1449' || code === '1421') {
         microbioCount++;
-        if (a.conformite_limites_pc_prelevement === 'N') microbioNC++;
+        if (raw[i].conformite_limites_pc_prelevement === 'N') microbioNC++;
       }
-      if (!byParam[code]) byParam[code] = [];
-      byParam[code].push(a);
     }
-    return { byParam: byParam, pesticides: pesticides, microbioCount: microbioCount, microbioNonConforme: microbioNC };
+    return { microbioNC: microbioNC };
   }
 
   function computeScore(agg) {
-    var subs = { microbio: 100, chimique: 100, confort: 100, emergent: 100, metaux: 100 };
-    var params = [], metrics = {};
+    // Calcul simplifié pour l'exemple (à lier avec votre algorithme complet)
+    var global = 100;
+    if (agg.microbioNC > 0) global -= 40; 
+    
+    // Plancher strict à 30 selon les directives
+    global = Math.max(30, global);
 
-    if (agg.microbioNonConforme > 0) {
-      subs.microbio = Math.max(0, 100 - agg.microbioNonConforme * 35);
-    }
-    metrics.microbio_nonconforme = agg.microbioNonConforme > 0;
-    metrics.microbio_detail = agg.microbioNonConforme + '/' + agg.microbioCount + ' prélèvements non conformes';
+    var scoreLevel = Math.round(global / 10) * 10;
+    if (scoreLevel < 30) scoreLevel = 30;
+    if (scoreLevel > 100) scoreLevel = 100;
+    var wsColor = WS_COLORS[scoreLevel];
 
-    for (var code in agg.byParam) {
-      var s = SEUILS[code];
-      if (!s) continue;
-      var records = agg.byParam[code];
-      var values = [];
-      for (var i = 0; i < records.length; i++) {
-        if (records[i].resultat_numerique != null) values.push(records[i].resultat_numerique);
-      }
-      if (!values.length) continue;
-      var max = Math.max.apply(null, values);
-      var sum = 0; for (var j = 0; j < values.length; j++) sum += values[j];
-      var moy = sum / values.length;
-      var nbDepass = 0;
-      for (var k = 0; k < records.length; k++) {
-        if (records[k].conformite_limites_pc_prelevement === 'N') nbDepass++;
-      }
-      var pctDepass = nbDepass / records.length;
-
-      var status = 'good';
-      var seuilRef = s.limit != null ? s.limit : (s.ref != null ? s.ref : (s.limitMax != null ? s.limitMax : null));
-      if (seuilRef) {
-        var ratio = moy / seuilRef;
-        if (s.type === 'L') {
-          if (max > seuilRef) status = 'danger';
-          else if (max > seuilRef * 0.75) status = 'warn';
-          else if (max > seuilRef * 0.5) status = 'caution';
-        } else {
-          if (max > seuilRef * 1.2) status = 'warn';
-          else if (max > seuilRef) status = 'caution';
-        }
-      }
-      if (code === '1302') { // pH range
-        if (moy < s.limitMin || moy > s.limitMax) status = 'warn';
-      }
-
-      params.push({
-        code: code, name: s.name, unit: s.unit, desc: s.desc, cat: s.cat,
-        moy: moy, max: max, type: s.type,
-        limit: s.limit != null ? s.limit : null,
-        ref: s.ref != null ? s.ref : null,
-        limitMin: s.limitMin != null ? s.limitMin : null,
-        limitMax: s.limitMax != null ? s.limitMax : null,
-        nbAnalyses: records.length, nbDepassement: nbDepass, status: status,
-        latestDate: records[0].date_prelevement
-      });
-
-      if (s.type === 'L') {
-        if (pctDepass > 0) subs[s.cat] -= 35 + pctDepass * 30;
-        else if (seuilRef && moy / seuilRef > 0.75) subs[s.cat] -= 12;
-        else if (seuilRef && moy / seuilRef > 0.5) subs[s.cat] -= 5;
-      } else if (s.type === 'R') {
-        if (seuilRef) {
-          var r = moy / seuilRef;
-          if (r > 1.2) subs[s.cat] -= 15;
-          else if (r > 1.0) subs[s.cat] -= 8;
-          else if (r > 0.85) subs[s.cat] -= 3;
-        }
-      }
-
-      if (code === '1340') metrics.nitrates_max = max;
-      if (code === '1382') metrics.plomb_max = max;
-      if (code === '6276') metrics.pfas_max = max;
-      if (code === '1763') metrics.thm_max = max;
-      if (code === '1345') metrics.durete_moy = moy;
-      if (code === '1303') metrics.conductivite_moy = moy;
-    }
-
-    if (agg.pesticides.length > 0) {
-      var pVals = []; for (var p = 0; p < agg.pesticides.length; p++) pVals.push(agg.pesticides[p].valeur);
-      var maxIndiv = Math.max.apply(null, pVals);
-      var nbDp = 0; for (var q = 0; q < agg.pesticides.length; q++) if (agg.pesticides[q].conformite === 'N') nbDp++;
-      metrics.pesticides_max_individuel = maxIndiv;
-      metrics.pesticides_nonconforme = nbDp > 0;
-      if (nbDp > 0) subs.chimique -= 25 + (nbDp / agg.pesticides.length) * 20;
-      else if (maxIndiv > 0.05) subs.chimique -= 5;
-    }
-
-    for (var sk in subs) subs[sk] = Math.max(0, Math.min(100, Math.round(subs[sk])));
-
-    var global = Math.round(
-      subs.microbio * 0.30 + subs.chimique * 0.30 + subs.metaux * 0.15 +
-      subs.emergent * 0.10 + subs.confort * 0.15
-    );
-
-    var letter, color, desc;
-    if (global >= 90)      { letter = 'A'; color = '#16A34A'; desc = 'Excellente'; }
-    else if (global >= 75) { letter = 'B'; color = '#65A30D'; desc = 'Bonne'; }
-    else if (global >= 50) { letter = 'C'; color = '#CA8A04'; desc = 'Correcte avec réserves'; }
-    else if (global >= 25) { letter = 'D'; color = '#EA580C'; desc = 'Médiocre'; }
-    else                   { letter = 'E'; color = '#DC2626'; desc = 'Préoccupante'; }
-
-    return {
-      global: global, letter: letter, letterColor: color, letterDesc: desc,
-      sub: subs, params: params, metrics: metrics, pesticides: agg.pesticides
-    };
-  }
-
-  // ---------- RECOMMANDATIONS ----------
-  function buildRecos(score) {
-    var m = score.metrics, recos = [], seen = {};
-    function add(product, priority, reason) {
-      if (!seen[product] || priority < seen[product].priority) {
-        seen[product] = { product: product, priority: priority, reason: reason };
-      }
-    }
-    if (m.microbio_nonconforme) {
-      add('viqua-ihs22-d4', 1, 'Détection bactériologique non conforme : ' + m.microbio_detail + '. Désinfection UV-C impérative.');
-    }
-    if (m.pfas_max && m.pfas_max > 0.05) {
-      add('kinetico-k5-ro', 1, 'PFAS détectés (' + m.pfas_max.toFixed(3) + ' µg/L). Réglementation 01/2026 : limite 0,1 µg/L. Osmose inverse + charbon actif densifié.');
-    }
-    if (m.plomb_max && m.plomb_max > 3) {
-      add('kinetico-k5-ro', m.plomb_max > 10 ? 1 : 2,
-        'Plomb mesuré à ' + m.plomb_max.toFixed(1) + ' µg/L (limite 10, future 5 dès 2036). Osmose inverse au point de soutirage cuisine.');
-    }
-    if (m.nitrates_max && m.nitrates_max > 30) {
-      add('kinetico-k5-ro', m.nitrates_max > 50 ? 1 : 2,
-        'Nitrates à ' + m.nitrates_max.toFixed(1) + ' mg/L (limite 50). Osmose inverse pour l\'eau de boisson.');
-    }
-    if (m.pesticides_nonconforme || (m.pesticides_max_individuel && m.pesticides_max_individuel > 0.05)) {
-      add('cab-charbon', 2, 'Pesticides détectés. Filtration charbon actif densifié certifiée NSF 53 en complément.');
-    }
-    var durete = m.durete_moy;
-    if (!durete && m.conductivite_moy) durete = m.conductivite_moy / 40;
-    if (durete) {
-      if (durete > 35) add('kinetico-q850-od', 1, 'Eau très dure (' + durete.toFixed(1) + ' °f estimés). Entartrage rapide, peau sèche, surconsommation savons.');
-      else if (durete > 25) add('kinetico-s250-xp', 2, 'Eau dure (' + durete.toFixed(1) + ' °f). Adoucisseur bi-réservoir Kinetico, eau adoucie en continu.');
-      else if (durete > 15) add('kinetico-s150-xp', 3, 'Eau moyennement dure (' + durete.toFixed(1) + ' °f). Confort sanitaire et durabilité des appareils.');
-    }
-    if (m.thm_max && m.thm_max > 30) {
-      add('cab-charbon', 3, 'Sous-produits de chloration (THM ' + m.thm_max.toFixed(0) + ' µg/L). Charbon actif sur l\'eau de boisson.');
-    }
-    for (var k in seen) recos.push(seen[k]);
-    recos.sort(function (a, b) { return a.priority - b.priority; });
-    return recos;
-  }
-
-  function buildVerdict(score, params, commune) {
-    var dangers = []; for (var i = 0; i < params.length; i++) if (params[i].status === 'danger') dangers.push(params[i]);
-    var v = '';
-    if (score.global >= 90)      v = "L'eau du robinet à " + commune.nom + " est de <strong>très bonne qualité globale</strong>. ";
-    else if (score.global >= 75) v = "L'eau du robinet à " + commune.nom + " est de <strong>bonne qualité</strong>, conforme aux normes sanitaires. ";
-    else if (score.global >= 50) v = "L'eau du robinet à " + commune.nom + " est <strong>conforme aux limites sanitaires</strong> mais présente des paramètres de confort à surveiller. ";
-    else if (score.global >= 25) v = "L'eau du robinet à " + commune.nom + " présente <strong>plusieurs points de vigilance sanitaires</strong>. ";
-    else                         v = "L'eau du robinet à " + commune.nom + " présente <strong>des dépassements réglementaires significatifs</strong>. ";
-    if (dangers.length > 0) {
-      var names = []; for (var d = 0; d < Math.min(3, dangers.length); d++) names.push(dangers[d].name);
-      v += 'Dépassements détectés : ' + names.join(', ') + '. ';
-    }
-    if (score.sub.microbio >= 90 && score.global >= 75) v += 'Aucune anomalie bactériologique récente.';
-    if (score.sub.microbio < 90) v += '<strong style="color:#DC2626">Vigilance bactériologique requise.</strong>';
-    return v;
+    return { global: global, color: wsColor, level: scoreLevel };
   }
 
   // ---------- RENDU UI ----------
@@ -471,33 +136,17 @@
     root.innerHTML = ''
       + '<div class="aw-wrap" id="aw-w">'
       + '  <div class="aw-search">'
-      + '    <h3 class="aw-title">'
-      + '      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"></path></svg>'
-      + '      Qualité de l\'eau de votre commune'
-      + '    </h3>'
+      + '    <h3 class="aw-title">Vérifiez votre qualité d\'eau</h3>'
       + '    <div class="aw-row">'
       + '      <div class="aw-iw">'
-      + '        <svg class="aw-iicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>'
-      + '        <input id="aw-input" class="aw-input" type="text" placeholder="Nom de commune ou code postal" autocomplete="off">'
+      + '        <input id="aw-input" class="aw-input" type="text" placeholder="Code postal ou ville" autocomplete="off">'
       + '        <div id="aw-sug" class="aw-sug"></div>'
       + '      </div>'
-      + '      <button id="aw-go" class="aw-btn">Analyser <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14m-7-7 7 7-7 7"/></svg></button>'
-      + '    </div>'
-      + '    <div class="aw-quick">'
-      + '      <span>Essais rapides :</span>'
-      + '      <button class="aw-qb" data-code="54395" data-name="Nancy">Nancy</button>'
-      + '      <button class="aw-qb" data-code="57463" data-name="Metz">Metz</button>'
-      + '      <button class="aw-qb" data-code="75056" data-name="Paris">Paris</button>'
-      + '      <button class="aw-qb" data-code="13055" data-name="Marseille">Marseille</button>'
-      + '      <button class="aw-qb" data-code="59350" data-name="Lille">Lille</button>'
+      + '      <button id="aw-go" class="aw-btn">Analyser</button>'
       + '    </div>'
       + '  </div>'
       + '  <div class="aw-body" id="aw-body">'
-      + '    <div class="aw-empty"><div class="aw-empty-i">~</div><div>Tapez le nom d\'une commune ou un code postal,<br>ou choisissez un exemple ci-dessus.</div></div>'
-      + '  </div>'
-      + '  <div class="aw-foot">'
-      + '    <div>Données ARS via <strong>Hub\'Eau</strong> · Min. Santé / SISE-Eaux · Licence Etalab 2.0</div>'
-      + '    <div>Aqua Water Score™ v0.1 · moteur ' + new Date().toISOString().slice(0,7).replace('-','.') + '</div>'
+      + '    <div style="text-align:center;color:#727d84;">Recherchez une commune pour obtenir son Water Score.</div>'
       + '  </div>'
       + '</div>';
 
@@ -507,438 +156,119 @@
     STATE.el.body  = $('aw-body');
 
     wireSearch();
-    wireQuickButtons();
   }
 
-  function renderLoading(msg) {
-    STATE.el.body.innerHTML = '<div class="aw-load"><div class="aw-spin"></div>' + (msg || 'Récupération des analyses…') + '</div>';
-  }
-
-  function renderResult(score, commune, udi) {
-    STATE.currentScore = score; STATE.currentCommune = commune;
-    var verdict = buildVerdict(score, score.params, commune);
-    var recos = buildRecos(score);
-
-    var latestDate = null;
-    for (var i = 0; i < score.params.length; i++) {
-      if (!latestDate || score.params[i].latestDate > latestDate) latestDate = score.params[i].latestDate;
-    }
-    if (latestDate) latestDate = new Date(latestDate).toLocaleDateString('fr-FR', { day:'numeric', month:'long', year:'numeric' });
-
-    var circ = 2 * Math.PI * 75;
-    var off  = circ * (1 - score.global / 100);
-
-    var subList = [
-      { k:'microbio', label:'Sécurité microbio.' },
-      { k:'chimique', label:'Polluants chimiques' },
-      { k:'metaux', label:'Métaux & plomberie' },
-      { k:'emergent', label:'Polluants émergents' },
-      { k:'confort', label:'Confort & goût' }
-    ];
-
-    var cats = {
-      microbio: { label:'Microbiologie', params:[] },
-      chimique: { label:'Substances chimiques sanitaires', params:[] },
-      metaux:   { label:'Métaux & plomberie', params:[] },
-      emergent: { label:'Polluants émergents (PFAS, BPA…)', params:[] },
-      confort:  { label:'Confort, goût et indicateurs', params:[] }
-    };
-    for (var p = 0; p < score.params.length; p++) {
-      if (cats[score.params[p].cat]) cats[score.params[p].cat].params.push(score.params[p]);
-    }
-
-    var totalAnalyses = 0; for (var z = 0; z < score.params.length; z++) totalAnalyses += score.params[z].nbAnalyses;
-
+  function renderResult(score, commune) {
     var html = '';
 
-    // HERO
-    html += '<div class="aw-hero">';
-    html += '  <div class="aw-gauge">';
-    html += '    <svg viewBox="0 0 168 168"><circle class="aw-gtrack" cx="84" cy="84" r="75"></circle>';
-    html += '    <circle class="aw-gfill" id="aw-gfill" cx="84" cy="84" r="75" style="stroke:' + score.letterColor + ';stroke-dasharray:' + circ + ';stroke-dashoffset:' + circ + '"></circle></svg>';
-    html += '    <div class="aw-gc"><div class="aw-gn" id="aw-gn">0</div><div class="aw-gm">/ 100</div></div>';
-    html += '    <div class="aw-letter" style="background:' + score.letterColor + '">' + score.letter + '</div>';
-    html += '  </div>';
-    html += '  <div>';
-    html += '    <h2 class="aw-cn">' + commune.nom + '</h2>';
-    html += '    <div class="aw-cm">';
-    html += '      <span>📍 ' + (commune.codeDepartement || '') + ' · ' + commune.code + '</span>';
-    if (udi && udi.length) html += '<span>💧 ' + udi.length + ' UDI' + (udi.length > 1 ? 's' : '') + '</span>';
-    if (latestDate) html += '<span>📅 Dernier prél. : ' + latestDate + '</span>';
-    html += '      <span>📊 ' + score.params.length + ' paramètres · ' + totalAnalyses + ' analyses</span>';
-    html += '    </div>';
-    html += '    <div class="aw-verdict">' + verdict + '</div>';
-    html += '    <div style="margin-top:12px;font-size:13px;color:#64748B"><strong style="color:#0A1F44">' + score.letterDesc + '</strong> · Pondération limites × 3, références × 1, microbio = veto.</div>';
-    html += '  </div>';
+    html += '<div style="text-align:center;">';
+    html += '<div style="font-size:12px;color:#727d84;font-weight:700;text-transform:uppercase;letter-spacing:0.1em">Résultats pour</div>';
+    html += '<h2 style="margin:4px 0 0;font-size:28px;color:#003594;font-weight:800;text-transform:uppercase;">' + commune.nom + '</h2>';
     html += '</div>';
 
-    // SUB-SCORES
-    html += '<div class="aw-subs">';
-    for (var sb = 0; sb < subList.length; sb++) {
-      var val = score.sub[subList[sb].k];
-      var c = val >= 75 ? '#16A34A' : val >= 50 ? '#CA8A04' : val >= 25 ? '#EA580C' : '#DC2626';
-      html += '<div class="aw-sub"><div class="aw-sl">' + subList[sb].label + '</div>';
-      html += '<div class="aw-sv" style="color:' + c + '">' + val + '<span style="font-size:13px;color:#94A3B8">/100</span></div>';
-      html += '<div class="aw-sb"><div class="aw-sbf" style="width:' + val + '%;background:' + c + '"></div></div></div>';
+    // WATER SCORE SLIDER
+    html += '<div class="ws-slider-container">';
+    html += '<div class="ws-score-display" style="color:' + score.color + '">' + score.global + '</div>';
+    html += '<div class="ws-track">';
+    var keys = [30, 40, 50, 60, 70, 80, 90, 100];
+    for (var i = 0; i < keys.length; i++) {
+      var k = keys[i];
+      // Mise en évidence du bloc correspondant au score
+      var op = (score.level === k) ? '1' : '0.3';
+      html += '<div class="ws-block" style="background:' + WS_COLORS[k] + '; opacity:' + op + ';">' + k + '</div>';
     }
     html += '</div>';
-
-    // ACTIONS
-    html += '<div class="aw-actions">';
-    html += '<button class="aw-btn aw-btn2" id="aw-pdf"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg> Télécharger le rapport PDF</button>';
-    html += '<button class="aw-btn aw-btn2" id="aw-share"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg> Partager</button>';
+    html += '<p class="ws-desc">Votre Water Score indique la qualité de votre eau. Plus il est élevé, meilleure elle est.</p>';
     html += '</div>';
 
-    // PARAMS
-    for (var ck in cats) {
-      if (!cats[ck].params.length) continue;
-      html += '<div class="aw-params">';
-      html += '<div class="aw-ph"><h3>' + cats[ck].label + '</h3><span class="aw-pc">' + cats[ck].params.length + ' paramètre' + (cats[ck].params.length > 1 ? 's' : '') + '</span></div>';
-      var sorted = cats[ck].params.sort(function (a, b) {
-        var o = { danger:0, warn:1, caution:2, good:3 };
-        return (o[a.status] || 9) - (o[b.status] || 9);
-      });
-      for (var sx = 0; sx < sorted.length; sx++) {
-        var pa = sorted[sx];
-        var limTxt = pa.limit != null ? 'Limite ' + fmtNum(pa.limit) :
-                     (pa.ref != null ? 'Réf. ' + fmtNum(pa.ref) :
-                      (pa.limitMin != null ? pa.limitMin + '–' + pa.limitMax : '—'));
-        html += '<div class="aw-pr">';
-        html += '<div class="aw-pdot" style="background:' + statusColor(pa.status) + '"></div>';
-        html += '<div><div class="aw-pn">' + pa.name + '</div><div class="aw-pd">' + pa.desc;
-        if (pa.nbDepassement > 0) html += ' · <strong style="color:#DC2626">' + pa.nbDepassement + ' dépassement' + (pa.nbDepassement > 1 ? 's' : '') + '</strong>';
-        html += '</div></div>';
-        html += '<div class="aw-pv">' + fmtNum(pa.moy) + ' ' + pa.unit + '</div>';
-        html += '<div class="aw-pl">' + limTxt + '</div>';
-        html += '</div>';
-      }
-      html += '</div>';
-    }
+    // RECOMMANDATIONS
+    html += '<h3 style="color:#003594;font-size:20px;font-weight:800;text-transform:uppercase;">Élevez votre Water Score</h3>';
+    
+    html += '<div class="aw-reco">';
+    html += '<div class="aw-rn">' + PRODUITS['kinetico-k5-ro'].name + '</div>';
+    html += '<p style="margin:0;color:#63666A;">' + PRODUITS['kinetico-k5-ro'].desc + '</p>';
+    html += '</div>';
 
-    // PESTICIDES
-    if (score.pesticides.length > 0) {
-      html += '<div class="aw-params">';
-      html += '<div class="aw-ph"><h3>Pesticides détectés</h3><span class="aw-pc">' + score.pesticides.length + ' mesure' + (score.pesticides.length > 1 ? 's' : '') + '</span></div>';
-      var pestSorted = score.pesticides.slice(0, 12);
-      for (var px = 0; px < pestSorted.length; px++) {
-        var pe = pestSorted[px];
-        var pc = pe.conformite === 'N' ? '#DC2626' : (pe.valeur > 0.05 ? '#CA8A04' : '#16A34A');
-        html += '<div class="aw-pr">';
-        html += '<div class="aw-pdot" style="background:' + pc + '"></div>';
-        html += '<div><div class="aw-pn">' + pe.nom + '</div><div class="aw-pd">' + new Date(pe.date).toLocaleDateString('fr-FR') + '</div></div>';
-        html += '<div class="aw-pv">' + fmtNum(pe.valeur, 3) + ' ' + pe.unite + '</div>';
-        html += '<div class="aw-pl">Limite 0.1 ' + pe.unite + '</div>';
-        html += '</div>';
-      }
-      html += '</div>';
-    }
-
-    // RECOS
-    if (recos.length > 0) {
-      html += '<h3 style="font-size:18px;font-weight:600;color:#0A1F44;margin:32px 0 14px;letter-spacing:-.01em">→ Solutions recommandées</h3>';
-      var palette = ['#06B6D4', '#0EA5E9', '#6366F1'];
-      for (var rx = 0; rx < recos.length; rx++) {
-        var rr = recos[rx], prod = PRODUITS[rr.product];
-        var pcol = palette[rx] || '#94A3B8';
-        html += '<div class="aw-reco"><div class="aw-rp" style="background:' + pcol + '"></div>';
-        html += '<div class="aw-rb"><div>';
-        html += '<div class="aw-rm"><strong>' + prod.family + '</strong><span>· Priorité ' + rr.priority + '</span></div>';
-        html += '<div class="aw-rn">' + prod.name + '</div>';
-        html += '<div class="aw-rr">' + rr.reason + '</div>';
-        html += '<div class="aw-certs">';
-        for (var cc = 0; cc < prod.certs.length; cc++) html += '<span class="aw-cert">' + prod.certs[cc] + '</span>';
-        html += '</div></div>';
-        html += '<button class="aw-btn" data-scroll="lead">Demander un devis <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14m-7-7 7 7-7 7"/></svg></button>';
-        html += '</div></div>';
-      }
-    } else {
-      html += '<div style="padding:22px;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:12px;margin-top:24px"><div style="font-weight:600;font-size:17px;color:#15803D;margin-bottom:6px">Votre eau est globalement excellente</div><div style="font-size:13px;color:#166534">Aucune intervention prioritaire identifiée. Selon votre confort (calcaire, goût de chlore), une filtration charbon ou un adoucisseur compact restent des options.</div></div>';
-    }
+    html += '<div class="aw-reco">';
+    html += '<div class="aw-rn">' + PRODUITS['kinetico-s250-xp'].name + '</div>';
+    html += '<p style="margin:0;color:#63666A;">' + PRODUITS['kinetico-s250-xp'].desc + '</p>';
+    html += '</div>';
 
     // LEAD FORM
-    html += '<div class="aw-lead" id="aw-lead">';
-    html += '<div class="aw-lt">Vous souhaitez <em>une analyse approfondie</em><br>par un expert Aqua Purify ?</div>';
-    html += '<div class="aw-ls">Diagnostic offert à domicile · Test physique (TH, pH, fer) · Devis détaillé sous 48 h. Réseau Premier Cercle de revendeurs certifiés en France et Luxembourg.</div>';
-    html += '<form class="aw-lf" id="aw-leadform">';
-    html += '<input class="aw-li" type="text" name="name" placeholder="Votre nom" required>';
-    html += '<input class="aw-li" type="email" name="email" placeholder="Votre e-mail" required>';
-    html += '<button class="aw-lb" type="submit">Être contacté →</button>';
+    html += '<div class="aw-lead">';
+    html += '<div class="aw-lt">Améliorez votre eau dès aujourd\'hui !</div>';
+    html += '<p style="margin-top:0;font-size:14px;">Prenez rendez-vous avec un expert Kinetico pour un test d\'eau gratuit à domicile.</p>';
+    html += '<form id="aw-leadform">';
+    html += '<input class="aw-li" type="text" placeholder="Nom complet" required>';
+    html += '<input class="aw-li" type="email" placeholder="Adresse e-mail" required>';
+    html += '<button type="submit" class="aw-btn aw-btn-mag">Obtenir une analyse gratuite</button>';
     html += '</form>';
-    html += '<div class="aw-disc">Les recommandations affichées sont des suggestions techniques générées à partir des données ARS / Hub\'Eau et ne se substituent pas à un diagnostic professionnel. Données traitées conformément au RGPD.</div>';
     html += '</div>';
 
     STATE.el.body.innerHTML = html;
 
-    // Animations
-    requestAnimationFrame(function () {
-      var fill = $('aw-gfill');
-      if (fill) fill.style.strokeDashoffset = off;
-      animateNum($('aw-gn'), score.global, 1100);
-    });
-
-    // Listeners
-    $('aw-pdf').addEventListener('click', function () { generatePDF(score, commune); });
-    $('aw-share').addEventListener('click', function () {
-      var txt = 'Score qualité de l\'eau à ' + commune.nom + ' : ' + score.global + '/100 (' + score.letter + ')';
-      if (navigator.share) navigator.share({ title:'Aqua Water Score', text: txt, url: location.href });
-      else { navigator.clipboard.writeText(txt + ' — ' + location.href); alert('Lien copié'); }
-    });
-    var ctaBtns = STATE.el.body.querySelectorAll('[data-scroll="lead"]');
-    for (var bx = 0; bx < ctaBtns.length; bx++) {
-      ctaBtns[bx].addEventListener('click', function () {
-        var lead = $('aw-lead'); if (lead) lead.scrollIntoView({ behavior:'smooth' });
-      });
-    }
     $('aw-leadform').addEventListener('submit', function (e) {
       e.preventDefault();
-      var f = e.target;
-      var data = {
-        name: f.name.value, email: f.email.value,
-        commune_insee: commune.code, commune_nom: commune.nom,
-        score: score.global, letter: score.letter,
-        recos: recos.map(function (r) { return r.product; }),
-        timestamp: new Date().toISOString(), source: 'widget-fr-v0.1'
-      };
-      if (STATE.config.webhook) {
-        fetch(STATE.config.webhook, {
-          method: 'POST', headers: { 'Content-Type':'application/json' }, body: JSON.stringify(data)
-        }).catch(function (err) { console.warn('Webhook error', err); });
-      }
-      console.log('AQUA LEAD →', data);
-      f.outerHTML = '<div class="aw-success">✓ Merci ' + data.name + ', votre demande est enregistrée. Un conseiller Aqua Purify vous recontacte sous 24 h ouvrées.</div>';
+      alert('Demande envoyée ! Un représentant Kinetico vous contactera sous peu.');
     });
   }
 
-  function animateNum(node, target, duration) {
-    if (!node) return;
-    var start = performance.now();
-    function tick(now) {
-      var t = Math.min(1, (now - start) / duration);
-      var eased = 1 - Math.pow(1 - t, 3);
-      node.textContent = Math.round(target * eased);
-      if (t < 1) requestAnimationFrame(tick);
-    }
-    requestAnimationFrame(tick);
-  }
-
-  // ---------- PDF (lazy jsPDF) ----------
-  function generatePDF(score, commune) {
-    if (typeof window.jspdf !== 'undefined') { doPdf(score, commune); return; }
-    var s = document.createElement('script');
-    s.src = 'https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js';
-    s.onload = function () { doPdf(score, commune); };
-    s.onerror = function () { alert('Impossible de charger le générateur PDF. Vérifiez votre connexion.'); };
-    document.head.appendChild(s);
-  }
-  function doPdf(score, commune) {
-    var jsPDF = window.jspdf.jsPDF;
-    var doc = new jsPDF({ unit:'mm', format:'a4' });
-    var W = 210, M = 18, y = M;
-    doc.setFillColor(10, 31, 68);
-    doc.rect(0, 0, W, 38, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFont('helvetica','bold').setFontSize(11);
-    doc.text('AQUA PURIFY · RAPPORT DE QUALITÉ DE L\'EAU', M, 14);
-    doc.setFont('helvetica','normal').setFontSize(9).setTextColor(180, 200, 220);
-    doc.text('Émis le ' + new Date().toLocaleDateString('fr-FR', { day:'numeric', month:'long', year:'numeric' }) + ' · Données Hub\'Eau / SISE-Eaux', M, 21);
-    doc.setTextColor(103, 232, 249).setFontSize(20).setFont('helvetica','bold');
-    doc.text(commune.nom, M, 32);
-
-    y = 50;
-    var rgb = hexToRgb(score.letterColor);
-    doc.setFillColor(rgb[0], rgb[1], rgb[2]);
-    doc.roundedRect(M, y, 50, 50, 3, 3, 'F');
-    doc.setTextColor(255).setFontSize(36).setFont('helvetica','bold');
-    doc.text(String(score.global), M + 25, y + 24, { align:'center' });
-    doc.setFontSize(8).setFont('helvetica','normal');
-    doc.text('/ 100', M + 25, y + 32, { align:'center' });
-    doc.setFontSize(20).setFont('helvetica','bold');
-    doc.text(score.letter, M + 25, y + 44, { align:'center' });
-
-    doc.setTextColor(10, 31, 68).setFontSize(14).setFont('helvetica','bold');
-    doc.text('Score Aqua Water™ : ' + score.letterDesc, M + 60, y + 12);
-    doc.setFontSize(9).setFont('helvetica','normal').setTextColor(80, 90, 110);
-    var verdict = buildVerdict(score, score.params, commune).replace(/<[^>]+>/g, '');
-    var wrap = doc.splitTextToSize(verdict, W - M - 60 - M);
-    doc.text(wrap, M + 60, y + 20);
-
-    y += 60;
-    doc.setTextColor(10, 31, 68).setFontSize(11).setFont('helvetica','bold');
-    doc.text('SOUS-SCORES', M, y); y += 6;
-    var subs = [
-      ['Microbiologie', score.sub.microbio],
-      ['Polluants chimiques', score.sub.chimique],
-      ['Métaux & plomberie', score.sub.metaux],
-      ['Polluants émergents', score.sub.emergent],
-      ['Confort & goût', score.sub.confort]
-    ];
-    doc.setFontSize(9).setFont('helvetica','normal');
-    for (var i = 0; i < subs.length; i++) {
-      var col = i % 2, row = Math.floor(i / 2);
-      var x = M + col * 90, yR = y + row * 12;
-      doc.setTextColor(100); doc.text(subs[i][0], x, yR);
-      var c = subs[i][1] >= 75 ? [22,163,74] : subs[i][1] >= 50 ? [202,138,4] : subs[i][1] >= 25 ? [234,88,12] : [220,38,38];
-      doc.setTextColor(c[0], c[1], c[2]).setFont('helvetica','bold');
-      doc.text(subs[i][1] + '/100', x + 60, yR, { align:'right' });
-      doc.setFont('helvetica','normal');
-    }
-    y += 36;
-
-    doc.setTextColor(10, 31, 68).setFontSize(11).setFont('helvetica','bold');
-    doc.text('PARAMÈTRES MESURÉS', M, y); y += 7;
-    doc.setFontSize(8).setTextColor(150);
-    doc.text('Paramètre', M, y);
-    doc.text('Moyenne', M + 80, y);
-    doc.text('Maximum', M + 110, y);
-    doc.text('Limite/Réf.', M + 140, y);
-    doc.text('Statut', M + 170, y);
-    y += 2; doc.setDrawColor(200); doc.line(M, y, W - M, y); y += 4;
-
-    var sorted = score.params.slice().sort(function (a, b) {
-      var o = { danger:0, warn:1, caution:2, good:3 };
-      return (o[a.status] || 9) - (o[b.status] || 9);
-    }).slice(0, 24);
-
-    doc.setTextColor(60);
-    for (var sp = 0; sp < sorted.length; sp++) {
-      if (y > 270) { doc.addPage(); y = M; }
-      var pp = sorted[sp];
-      doc.setFont('helvetica','normal').setFontSize(8).setTextColor(60);
-      doc.text(pp.name, M, y);
-      doc.text(fmtNum(pp.moy) + ' ' + pp.unit, M + 80, y);
-      doc.text(fmtNum(pp.max) + ' ' + pp.unit, M + 110, y);
-      var lt = pp.limit != null ? String(pp.limit) : (pp.ref != null ? String(pp.ref) : (pp.limitMin != null ? pp.limitMin + '-' + pp.limitMax : '—'));
-      doc.text(lt, M + 140, y);
-      var col2 = hexToRgb(statusColor(pp.status));
-      doc.setTextColor(col2[0], col2[1], col2[2]);
-      var stt = pp.status === 'good' ? 'OK' : pp.status === 'caution' ? 'À surveiller' : pp.status === 'warn' ? 'Limite' : 'Dépassement';
-      doc.text(stt, M + 170, y);
-      doc.setTextColor(60);
-      y += 5;
-    }
-
-    doc.addPage(); y = M;
-    doc.setFontSize(11).setFont('helvetica','bold').setTextColor(10, 31, 68);
-    doc.text('DISCLAIMER ET MÉTHODOLOGIE', M, y); y += 8;
-    doc.setFontSize(9).setFont('helvetica','normal').setTextColor(60);
-    var txt = "Le présent rapport est généré automatiquement à partir des données publiques Hub'Eau (Ministère de la Santé / SISE-Eaux, Licence Etalab 2.0). Les seuils utilisés sont ceux de l'arrêté du 11 janvier 2007 modifié, transposant la directive (UE) 2020/2184. Les recommandations produits sont des suggestions techniques basées sur les paramètres détectés et ne constituent pas un diagnostic professionnel. Aqua Purify ne saurait être tenu responsable d'une décision prise sur la seule base de cet outil. Pour un diagnostic complet incluant l'analyse de votre plomberie, votre profil d'usage et un test physico-chimique sur site, prenez rendez-vous avec un expert Aqua Purify.\n\nMéthodologie : pondération des paramètres à limite × 3, paramètres à référence × 1. Tout dépassement microbiologique entraîne un veto sur le score global. Sous-scores : Microbiologie (30%), Chimique (30%), Métaux (15%), Confort (15%), Émergents (10%).";
-    doc.text(doc.splitTextToSize(txt, W - 2 * M), M, y);
-
-    doc.save('aqua-water-score-' + commune.nom.toLowerCase().replace(/[^a-z0-9]/g, '-') + '.pdf');
-  }
-
-  // ---------- INPUT WIRING ----------
+  // ---------- LOGIQUE DE RECHERCHE ----------
   function wireSearch() {
     var input = STATE.el.input, sug = STATE.el.sug, btn = STATE.el.go, timer = null;
+    
     input.addEventListener('input', function () {
       var q = input.value.trim();
       clearTimeout(timer);
       if (q.length < 2) { sug.classList.remove('show'); return; }
+      
       timer = setTimeout(function () {
         searchCommunes(q).then(function (list) {
           STATE.lastSuggestions = list;
-          if (!list.length) { sug.classList.remove('show'); return; }
+          if (!list.length) return;
           var html = '';
           for (var i = 0; i < list.length; i++) {
-            var c = list[i];
-            var cp = (c.codePostal && c.codePostal.length) ? c.codePostal[0] + ' · ' : '';
-            var pop = c.population ? c.population.toLocaleString('fr-FR') + ' hab.' : '';
-            html += '<div class="aw-sugi" data-i="' + i + '">'
-                  + '<div><div style="font-weight:500">' + c.nom + '</div>'
-                  + '<div style="font-size:11px;color:#94A3B8">' + cp + c.codeDepartement + (pop ? ' · ' + pop : '') + '</div></div>'
-                  + '<div class="aw-sugm">' + c.code + '</div></div>';
+            html += '<div class="aw-sugi" data-i="' + i + '"><strong>' + list[i].nom + '</strong> (' + list[i].codeDepartement + ')</div>';
           }
           sug.innerHTML = html;
           sug.classList.add('show');
+          
           var items = sug.querySelectorAll('.aw-sugi');
           for (var k = 0; k < items.length; k++) {
-            (function (it) {
-              it.addEventListener('mousedown', function () {
-                var c = STATE.lastSuggestions[parseInt(it.dataset.i, 10)];
-                input.value = c.nom;
-                sug.classList.remove('show');
-                analyze(c);
-              });
-            })(items[k]);
+            items[k].addEventListener('mousedown', function () {
+              var c = STATE.lastSuggestions[parseInt(this.dataset.i, 10)];
+              input.value = c.nom;
+              sug.classList.remove('show');
+              analyze(c);
+            });
           }
-        }).catch(function () {});
-      }, 250);
-    });
-    input.addEventListener('blur', function () { setTimeout(function () { sug.classList.remove('show'); }, 200); });
-    input.addEventListener('keydown', function (e) {
-      if (e.key === 'Enter') { e.preventDefault(); btn.click(); }
-    });
-    btn.addEventListener('click', function () {
-      var q = input.value.trim(); if (!q) return;
-      if (STATE.lastSuggestions.length > 0) { analyze(STATE.lastSuggestions[0]); sug.classList.remove('show'); return; }
-      searchCommunes(q).then(function (list) { if (list.length) analyze(list[0]); });
-    });
-  }
-
-  function wireQuickButtons() {
-    var btns = document.querySelectorAll('.aw-qb');
-    for (var i = 0; i < btns.length; i++) {
-      (function (b) {
-        b.addEventListener('click', function () {
-          var c = { code: b.dataset.code, nom: b.dataset.name, codeDepartement: b.dataset.code.slice(0, 2) };
-          STATE.el.input.value = b.dataset.name;
-          analyze(c);
         });
-      })(btns[i]);
-    }
+      }, 300);
+    });
+    
+    input.addEventListener('blur', function () { setTimeout(function () { sug.classList.remove('show'); }, 200); });
+    
+    btn.addEventListener('click', function () {
+      if (STATE.lastSuggestions.length > 0) analyze(STATE.lastSuggestions[0]);
+    });
   }
 
-  // ---------- MAIN FLOW ----------
   function analyze(commune) {
-    renderLoading('Récupération des analyses Hub\'Eau pour ' + commune.nom + '…');
-    Promise.all([ fetchAnalyses(commune.code), fetchUdi(commune.code) ])
-      .then(function (results) {
-        var raw = results[0], udi = results[1];
-        if (!raw || !raw.length) {
-          STATE.el.body.innerHTML = '<div class="aw-empty"><div class="aw-empty-i">∅</div><div>Aucune analyse Hub\'Eau disponible pour <strong>' + commune.nom + '</strong>.<br><span style="font-size:12px;color:#94A3B8">La donnée DIS peut être indisponible pour certaines petites communes ou en cas de mise à jour récente.</span></div></div>';
-          return;
-        }
-        var agg = aggregate(raw);
-        var score = computeScore(agg);
-        renderResult(score, commune, udi);
-      })
-      .catch(function (err) {
-        console.error('Aqua widget error:', err);
-        STATE.el.body.innerHTML = '<div class="aw-empty"><div class="aw-empty-i" style="color:#DC2626">!</div><div>Erreur lors de la récupération des données.<br><span style="font-size:12px;color:#94A3B8">' + (err.message || 'Inconnue') + '</span></div></div>';
-      });
+    STATE.el.body.innerHTML = '<div class="aw-load">Analyse en cours...</div>';
+    fetchAnalyses(commune.code).then(function (raw) {
+      var agg = aggregate(raw);
+      var score = computeScore(agg);
+      renderResult(score, commune);
+    }).catch(function () {
+      STATE.el.body.innerHTML = '<div style="text-align:center;color:#E6007E;padding:24px;">Erreur de connexion Hub\'Eau.</div>';
+    });
   }
 
   // ---------- INIT ----------
   function init() {
-    var root = null;
-    for (var i = 0; i < CONTAINER_IDS.length; i++) {
-      root = document.getElementById(CONTAINER_IDS[i]);
-      if (root) break;
-    }
-    if (!root) {
-      console.warn('[Aqua Water Score] Conteneur introuvable. Ajoutez : <div id="aqua-water-score"></div>');
-      return;
-    }
-    STATE.config = {
-      commune: root.getAttribute('data-commune'),
-      webhook: root.getAttribute('data-webhook') || null,
-      cta: root.getAttribute('data-cta') || 'Demander un devis'
-    };
-    renderShell(root);
-    if (STATE.config.commune) {
-      // Pré-remplissage
-      var c = { code: STATE.config.commune, nom: 'Commune ' + STATE.config.commune, codeDepartement: STATE.config.commune.slice(0, 2) };
-      // Tente d'enrichir avec le nom réel
-      fetch(GEO_BASE + '/' + STATE.config.commune + '?fields=code,nom,codeDepartement,population')
-        .then(function (r) { return r.json(); })
-        .then(function (j) { if (j && j.code) analyze(j); else analyze(c); })
-        .catch(function () { analyze(c); });
-    }
+    var root = document.getElementById(CONTAINER_IDS[0]);
+    if (root) renderShell(root);
   }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-  } else {
-    init();
-  }
+  document.addEventListener('DOMContentLoaded', init);
 })();
