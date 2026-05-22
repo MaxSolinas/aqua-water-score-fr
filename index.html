@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Qualité de l'eau · Aqua Water Score™</title>
+<meta name="description" content="Diagnostic gratuit de la qualité de votre eau du robinet en France. Analyses ARS via Hub'Eau, recommandations Kinetico et Viqua.">
+<style>
+  *,*::before,*::after { box-sizing: border-box; }
+  body { margin:0; padding:0; background:#FBFAF7; font-family:-apple-system,BlinkMacSystemFont,sans-serif; }
+  #aqua-water-score { max-width: 1024px; margin: 24px auto; padding: 0 16px; }
+</style>
+</head>
+<body>
+<div id="aqua-water-score"></div>
+<script src="./widget.js" defer></script>
+<script>
+// Lecture du code commune depuis l'URL : ?c=54395 ou ?commune=54395
+(function () {
+  var p = new URLSearchParams(location.search);
+  var c = p.get('c') || p.get('commune');
+  if (c && /^\d{5}$/.test(c)) {
+    document.getElementById('aqua-water-score').setAttribute('data-commune', c);
+  }
+  var w = p.get('webhook');
+  if (w) document.getElementById('aqua-water-score').setAttribute('data-webhook', w);
+})();
+</script>
+</body>
+</html>
